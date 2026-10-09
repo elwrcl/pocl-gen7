@@ -21,13 +21,16 @@ profile libgbe ./libgbe#llvm21-sys
 profile pocl ./pocl
 
 # libgbe: the compiler (libgbe, libgbeinterp) and beignet's OpenCL C library
-if [ ! -f build/libgbe/build.ninja ]; then
-  nix develop .profiles/libgbe -c cmake -S libgbe -B build/libgbe -G Ninja \
+if [ ! -f build/libgbe/Makefile ]; then
+  clang_lib=$(nix eval --raw --inputs-from ./libgbe \
+    nixpkgs-sys#llvmPackages_21.clang-unwrapped.lib.outPath)/lib
+  nix develop .profiles/libgbe -c cmake -S libgbe -B build/libgbe \
+    -DCLANG_LIBRARY_DIR="$clang_lib" \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
     -DBEIGNET_INSTALL_DIR=/usr/lib/beignet/ -DENABLE_OPENCL_20=ON \
-    -DOCLICD_COMPAT=ON -DBUILD_EXAMPLES=OFF
+    -DOCLICD_COMPAT=ON -DBUILD_EXAMPLES=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 fi
-nix develop .profiles/libgbe -c ninja -C build/libgbe
+nix develop .profiles/libgbe -c cmake --build build/libgbe -j "$(nproc)"
 
 # pocl with the gen7 and host CPU (pthread) devices
 if [ ! -f build/pocl/build.ninja ]; then
