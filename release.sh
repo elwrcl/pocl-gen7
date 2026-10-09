@@ -32,12 +32,13 @@ if [ ! -f build/libgbe/Makefile ]; then
 fi
 nix develop .profiles/libgbe -c cmake --build build/libgbe -j "$(nproc)"
 
-# pocl with the gen7 and host CPU (pthread) devices
+# pocl with the gen7 and host CPU (pthread) devices, on the system's shared
+# LLVM (a static one makes libpocl 116 MB, over GitHub's file limit)
 if [ ! -f build/pocl/build.ninja ]; then
   nix develop .profiles/pocl -c sh -c 'cmake -S pocl -B build/pocl -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
     -DCMAKE_INSTALL_LIBDIR=lib -DWITH_LLVM_CONFIG="$LLVM_CONFIG" \
-    -DSTATIC_LLVM=ON -DENABLE_ICD=ON -DPOCL_ICD_ABSOLUTE_PATH=OFF \
+    -DSTATIC_LLVM=OFF -DENABLE_ICD=ON -DPOCL_ICD_ABSOLUTE_PATH=OFF \
     -DENABLE_GEN7=ON -DBEIGNET_SRC_DIR="$PWD/libgbe" \
     -DGEN7_GBE_PATH=/usr/lib/beignet/libgbe.so \
     -DGEN7_INTERP_PATH=/usr/lib/beignet/libgbeinterp.so \
