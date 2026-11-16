@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # Release build of pocl-gen7 (pocl + the gen7 device on beignet's libgbe) for
 # the system: configures build/libgbe and build/pocl once, builds them,
-# installs into a staging directory and copies the tree into copland, where
-# hw-ivb-drivers packages it.
+# installs into a staging directory and copies the tree into ivb-drivers-bin,
+# which copland's hw-ivb-drivers packages (flake input `ivb-drivers`).
 #
-#   ./release.sh                      then: nixos-rebuild switch
+#   ./release.sh                      then: jj commit in ivb-drivers-bin,
+#                                     nix flake update ivb-drivers in copland,
+#                                     nixos-rebuild switch
 #
 # Both are built against the system's nixpkgs (libgbe: its llvm21-sys shell,
 # pocl: its default shell), so they link the system's LLVM 21 and libraries.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
-dest=${COPLAND_DRIVERS:-/home/elars/copland/drivers}/pocl-gen7
+dest=${IVB_DRIVERS_BIN:-/mnt/HDD/linuxdata/Projects_XFS/Drivers/ivb-drivers-bin}/pocl-gen7
 cd "$here"
 
 profile() { # name flake-ref
