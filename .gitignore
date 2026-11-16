@@ -1,5 +1,3 @@
-/pocl/
-/libgbe/
-/build/
-/.profiles/
+/build
+/.profiles
 /build-release.log
