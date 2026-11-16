@@ -1,0 +1,11 @@
+*.o
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+__pycache__/
+# beignet build writes these into the source tree
+kernels/builtin_*.cl
+kernels/compiler_ceil.bin
+utests/generated/
+src/git_sha1.h
