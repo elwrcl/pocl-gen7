@@ -1,0 +1,89 @@
+---
+name: Linux / CPU RISC-V 64 tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'release*'
+  workflow_dispatch:
+  pull_request:
+    paths-ignore:
+      - 'doc/**'
+      - 'CHANGES'
+      - 'COPYING'
+      - 'CREDITS'
+      - 'LICENSE'
+      - 'README.*'
+      - 'tools/docker/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  POCL_MAX_WORK_GROUP_SIZE: "2048"
+  CCACHE_BASEDIR: "${{ github.workspace }}"
+  CCACHE_DIR: "${{ github.workspace }}/../../../../ccache_storage"
+  EXAMPLES_DIR: "${{ github.workspace }}/../../../../examples"
+  BUILD_DIR: "${{ github.workspace }}/build"
+
+jobs:
+  riscv_matrix:
+    name: LLVM ${{ matrix.llvm }} - RISC-V CrossComp
+    runs-on: [self-hosted, linux, x64, RISCV64_CC]
+    strategy:
+      fail-fast: false
+      matrix:
+        llvm: [22]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Load Env vars
+        id: load-env
+        run: |
+          cat ${{ github.workspace }}/.github/variables.txt >> $GITHUB_ENV
+          cat $RISCV_CROSS_ENVIRONMENT >> $GITHUB_ENV
+
+      - name: Run CMake
+        id: cmake
+        run: |
+          rm -rf $BUILD_DIR
+          mkdir -p $BUILD_DIR
+          cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_MAKE_PROGRAM=/usr/bin/make -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_DIR=${TARGET_ROOT}/opt/LLVM_${{ matrix.llvm }} -DWITH_LLVM_CONFIG=/usr/bin/llvm-config-${{ matrix.llvm }} \
+            -DHOST_DEVICE_BUILD_HASH=${TARGET_TRIPLE} -DCMAKE_TOOLCHAIN_FILE=${TARGET_TOOLCHAIN_FILE}  \
+            -DLLC_TRIPLE=${TARGET_TRIPLE} -DLLC_HOST_CPU=${TARGET_CPU} -DCMAKE_PREFIX_PATH=${TARGET_ROOT} \
+            -DENABLE_ICD=ON -DENABLE_LOADABLE_DRIVERS=0 -DKERNELLIB_HOST_CPU_VARIANTS=${TARGET_CPU} \
+            -DENABLE_SPIRV=1 "$@" -B ${BUILD_DIR} ${{ github.workspace }}
+
+      - name: Run Build
+        id: build
+        run: |
+          cd $BUILD_DIR && make -j$(${{ github.workspace }}/.github/scripts/get_cpus.sh)
+
+      - name: Run Tests
+        env:
+          POCL_CACHE_DIR: "${{ runner.temp }}/GH_POCL_CACHE"
+        id: ctest
+        timeout-minutes: 120
+        run: |
+          ${{ github.workspace }}/tools/scripts/run_cross_compiled_cpu_tests ${{ github.workspace }} ${BUILD_DIR} ${REMOTE_ADDRESS} ${REMOTE_USER} ctest --output-on-failure -LE cpu_fail -E test_large_buf -j8
+
+      - name: Archive Artifacts
+        run: |
+          cd $BUILD_DIR && make install DESTDIR=/tmp/pocl_llvm_${{ matrix.llvm }}_${{ github.sha }}
+          tar -C /tmp -cavf /tmp/pocl_llvm_${{ matrix.llvm }}_${{ github.sha }}.tar.zst pocl_llvm_${{ matrix.llvm }}_${{ github.sha }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: "PoCL-RISCV-LLVM_${{ matrix.llvm }}-${{ github.sha }}"
+          path: "/tmp/pocl_llvm_${{ matrix.llvm }}_${{ github.sha }}.tar.zst"
+          if-no-files-found: error
+          archive: false
